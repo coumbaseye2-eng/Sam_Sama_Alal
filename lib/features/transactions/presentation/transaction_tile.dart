@@ -7,9 +7,10 @@ import '../domain/transaction_type.dart';
 import 'payment_method_badge.dart';
 
 class TransactionTile extends StatelessWidget {
-  const TransactionTile(this.transaction, {super.key});
+  const TransactionTile(this.transaction, {super.key, this.onReceipt});
 
   final AppTransaction transaction;
+  final VoidCallback? onReceipt;
 
   @override
   Widget build(BuildContext context) {
@@ -57,9 +58,32 @@ class TransactionTile extends StatelessWidget {
                 ],
               ),
             ),
-            Text(
-              '$sign${transaction.amount} FCFA',
-              style: TextStyle(color: color, fontWeight: FontWeight.w900),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$sign${transaction.amount} FCFA',
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
+                ),
+                if (onReceipt != null) ...[
+                  const SizedBox(width: 6),
+                  PopupMenuButton<String>(
+                    tooltip: 'Actions',
+                    onSelected: (value) {
+                      if (value == 'ticket') {
+                        onReceipt?.call();
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'ticket',
+                        child: Text('Ticket de caisse'),
+                      ),
+                    ],
+                    icon: const Icon(Icons.more_vert),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

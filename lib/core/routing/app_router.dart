@@ -19,6 +19,7 @@ import '../../features/transactions/presentation/confirmation_screen.dart';
 import '../../features/transactions/presentation/history_screen.dart';
 import '../../features/transactions/presentation/mode_rapide_screen.dart';
 import '../../features/transactions/presentation/transaction_entry_screen.dart';
+import '../../features/transactions/presentation/ticket_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -103,6 +104,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: '/profil', builder: (context, state) => const ProfileScreen()),
       GoRoute(
           path: '/carnet', builder: (context, state) => const NotesScreen()),
+      GoRoute(
+          path: '/ticket', builder: (context, state) => const TicketScreen()),
     ],
   );
 });
@@ -138,4 +141,3 @@ class _ForgotPinScreen extends StatelessWidget {
     );
   }
 }
-

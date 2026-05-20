@@ -6,6 +6,8 @@ import '../../../core/widgets/section_card.dart';
 import '../domain/transaction_type.dart';
 import 'transaction_tile.dart';
 import 'transactions_controller.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../data/receipt_service.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -27,6 +29,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           item.category.toLowerCase().contains(_query.toLowerCase());
       return matchesType && matchesQuery;
     }).toList();
+    final balance = ref.watch(balanceProvider);
+    final user = ref.watch(authControllerProvider).user;
 
     return PrimaryScaffold(
       title: 'Historique',
@@ -68,7 +72,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           if (transactions.isEmpty)
             const SectionCard(child: Text('Aucune transaction trouvée.'))
           else
-            ...transactions.map(TransactionTile.new),
+            ...transactions.map(
+              (transaction) => TransactionTile(
+                transaction,
+                onReceipt: transaction.type != TransactionType.sale
+                    ? null
+                    : () async {
+                        await const ReceiptService().shareReceipt(
+                          transaction: transaction,
+                          balanceAfter: balance,
+                          user: user,
+                        );
+                      },
+              ),
+            ),
         ],
       ),
     );

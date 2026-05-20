@@ -61,6 +61,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ...notes.map((note) => _NoteCard(
                   note: note,
                   onTap: () => _openNoteSheet(context, note: note),
+                  onEdit: () => _openNoteSheet(context, note: note),
                   onDelete: () => ref
                       .read(notesControllerProvider.notifier)
                       .deleteNote(note.id),
@@ -149,11 +150,13 @@ class _NoteCard extends StatelessWidget {
   const _NoteCard({
     required this.note,
     required this.onTap,
+    required this.onEdit,
     required this.onDelete,
   });
 
   final PersonalNote note;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
@@ -199,6 +202,10 @@ class _NoteCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
               ),
               IconButton(
                 onPressed: onDelete,
