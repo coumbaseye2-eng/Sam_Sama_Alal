@@ -4,8 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/section_card.dart';
-import '../../auth/presentation/auth_controller.dart';
-import '../data/receipt_service.dart';
 import '../domain/transaction_type.dart';
 import 'payment_method_badge.dart';
 import 'transactions_controller.dart';
@@ -16,9 +14,9 @@ class ConfirmationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transaction = ref.watch(latestTransactionProvider);
-    final user = ref.watch(authControllerProvider).user;
     final balance = ref.watch(balanceProvider);
     final isSale = transaction?.type == TransactionType.sale;
+    final productName = transaction?.productName;
 
     return Scaffold(
       body: SafeArea(
@@ -50,7 +48,14 @@ class ConfirmationScreen extends ConsumerWidget {
                           fontSize: 28, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 8),
-                    Text(transaction?.category ?? 'Autre'),
+                    Text(productName ?? transaction?.category ?? 'Autre'),
+                    if (isSale && transaction != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '${transaction.quantity} x ${transaction.unitPrice} FCFA',
+                        style: const TextStyle(color: AppColors.textMuted),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     PaymentMethodBadge(
                       method: transaction?.paymentMethod ?? 'Espèces',
@@ -66,20 +71,6 @@ class ConfirmationScreen extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
-              ElevatedButton.icon(
-                onPressed: transaction == null
-                    ? null
-                    : () async {
-                        await const ReceiptService().shareReceipt(
-                          transaction: transaction,
-                          balanceAfter: balance,
-                          user: user,
-                        );
-                      },
-                icon: const Icon(Icons.receipt_long),
-                label: const Text('Partager le ticket'),
-              ),
-              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => context.go('/dashboard'),
                 child: const Text('Retour à l’accueil'),

@@ -7,16 +7,19 @@ import '../domain/transaction_type.dart';
 import 'payment_method_badge.dart';
 
 class TransactionTile extends StatelessWidget {
-  const TransactionTile(this.transaction, {super.key, this.onReceipt});
+  const TransactionTile(this.transaction,
+      {super.key, this.onReceipt, this.onDelete});
 
   final AppTransaction transaction;
   final VoidCallback? onReceipt;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final isSale = transaction.type == TransactionType.sale;
     final sign = isSale ? '+' : '-';
     final color = isSale ? AppColors.primary : AppColors.primaryMuted;
+    final title = transaction.productName ?? transaction.category;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -38,9 +41,23 @@ class TransactionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.category,
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
+                  if (isSale && transaction.productName != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      '${transaction.quantity} x ${transaction.unitPrice} FCFA',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -49,36 +66,51 @@ class TransactionTile extends StatelessWidget {
                         compact: true,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '${transaction.type.label} · ${_time(transaction.createdAt)}',
-                        style: const TextStyle(color: AppColors.textMuted),
+                      Expanded(
+                        child: Text(
+                          '${transaction.type.label} · ${_time(transaction.createdAt)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: AppColors.textMuted),
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '$sign${transaction.amount} FCFA',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
-                if (onReceipt != null) ...[
+                if (onReceipt != null || onDelete != null) ...[
                   const SizedBox(width: 6),
                   PopupMenuButton<String>(
                     tooltip: 'Actions',
                     onSelected: (value) {
                       if (value == 'ticket') {
                         onReceipt?.call();
+                      } else if (value == 'delete') {
+                        onDelete?.call();
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'ticket',
-                        child: Text('Ticket de caisse'),
-                      ),
+                    itemBuilder: (context) => [
+                      if (onReceipt != null)
+                        const PopupMenuItem(
+                          value: 'ticket',
+                          child: Text('Ticket de caisse'),
+                        ),
+                      if (onDelete != null)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Supprimer'),
+                        ),
                     ],
                     icon: const Icon(Icons.more_vert),
                   ),

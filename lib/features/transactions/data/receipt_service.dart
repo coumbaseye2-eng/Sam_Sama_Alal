@@ -53,6 +53,14 @@ class ReceiptService {
               _line(),
               _row('Type', transaction.type.label),
               _row('Categorie', transaction.category),
+              if (transaction.productName != null)
+                _row('Produit', transaction.productName!),
+              if (isSale) _row('Quantite', '${transaction.quantity}'),
+              if (isSale)
+                _row(
+                  'Prix unitaire',
+                  '${_formatAmount(transaction.unitPrice)} FCFA',
+                ),
               _row('Paiement', transaction.paymentMethod),
               pw.SizedBox(height: 8),
               pw.Center(
@@ -83,6 +91,27 @@ class ReceiptService {
     final file = File('${directory.path}/ticket_$reference.pdf');
     await file.writeAsBytes(await pdf.save());
     return file;
+  }
+
+  Future<File> downloadReceipt({
+    required AppTransaction transaction,
+    required int balanceAfter,
+    AppUser? user,
+  }) async {
+    final tempFile = await generateReceiptPdf(
+      transaction: transaction,
+      balanceAfter: balanceAfter,
+      user: user,
+    );
+    final reference = transaction.id.length >= 8
+        ? transaction.id.substring(0, 8).toUpperCase()
+        : transaction.id.toUpperCase();
+    final directory = await getApplicationDocumentsDirectory();
+    final savedFile = File('${directory.path}/ticket_$reference.pdf');
+    if (await savedFile.exists()) {
+      await savedFile.delete();
+    }
+    return tempFile.copy(savedFile.path);
   }
 
   Future<void> shareReceipt({

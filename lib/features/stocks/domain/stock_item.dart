@@ -8,6 +8,7 @@ class StockItem {
     this.unitPrice = 0,
     this.alertThreshold = 3,
     required this.updatedAt,
+    this.isArchived = false,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class StockItem {
   final int unitPrice;
   final int alertThreshold;
   final DateTime updatedAt;
+  final bool isArchived;
 
   bool get isLow => quantity <= alertThreshold;
 
@@ -28,6 +30,7 @@ class StockItem {
     int? unitPrice,
     int? alertThreshold,
     DateTime? updatedAt,
+    bool? isArchived,
   }) {
     return StockItem(
       id: id,
@@ -38,6 +41,7 @@ class StockItem {
       unitPrice: unitPrice ?? this.unitPrice,
       alertThreshold: alertThreshold ?? this.alertThreshold,
       updatedAt: updatedAt ?? this.updatedAt,
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 
@@ -51,6 +55,7 @@ class StockItem {
       unitPrice: json['unitPrice'] as int? ?? 0,
       alertThreshold: json['alertThreshold'] as int? ?? 3,
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      isArchived: json['isArchived'] as bool? ?? false,
     );
   }
 
@@ -64,6 +69,7 @@ class StockItem {
       'unitPrice': unitPrice,
       'alertThreshold': alertThreshold,
       'updatedAt': updatedAt.toIso8601String(),
+      'isArchived': isArchived,
     };
   }
 }

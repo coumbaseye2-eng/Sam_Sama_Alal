@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/section_card.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../settings/domain/app_settings.dart';
+import '../../settings/presentation/settings_controller.dart';
 import '../../transactions/domain/transaction_type.dart';
 import '../../transactions/presentation/transactions_controller.dart';
 import '../../transactions/presentation/transaction_tile.dart';
@@ -16,6 +21,8 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).user;
     final transactions = ref.watch(transactionsControllerProvider);
+    final settings = ref.watch(settingsControllerProvider);
+    final text = _DashboardText.of(settings.language);
     final balance = ref.watch(balanceProvider);
     final goal = user?.dailyGoal ?? 0;
     final progress = goal <= 0 ? 0.0 : (balance / goal).clamp(0.0, 1.0);
@@ -28,7 +35,7 @@ class DashboardScreen extends ConsumerWidget {
     final netTotal = totalSales - totalExpenses;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -39,15 +46,25 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.primarySoft,
-                    child: Text(
-                      user?.initial ?? 'S',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  GestureDetector(
+                    onTap: () => context.go('/profil'),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.primarySoft,
+                      backgroundImage: user?.photoUrl != null &&
+                              File(user!.photoUrl!).existsSync()
+                          ? FileImage(File(user.photoUrl!))
+                          : null,
+                      child: user?.photoUrl == null ||
+                              !File(user!.photoUrl!).existsSync()
+                          ? Text(
+                              user?.initial ?? 'S',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -55,10 +72,10 @@ class DashboardScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Bonjour ${user?.firstName ?? ''}'),
-                        const Text(
-                          'Tableau de bord',
-                          style: TextStyle(
+                        Text('${text.hello} ${user?.firstName ?? ''}'),
+                        Text(
+                          text.dashboard,
+                          style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
                           ),
@@ -67,7 +84,23 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => context.push('/ticket'),
+                    onPressed: () {
+                      if (settings.notificationsEnabled) {
+                        NotificationService.instance.showNotification(
+                          title: 'Notifications activées',
+                          body:
+                              'Sam Sama Allal peut maintenant envoyer des alertes.',
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Notifications desactivees dans Parametres',
+                            ),
+                          ),
+                        );
+                      }
+                    },
                     icon: const Icon(Icons.notifications_none),
                   ),
                   PopupMenuButton<String>(
@@ -81,24 +114,36 @@ class DashboardScreen extends ConsumerWidget {
                         context.push('/ticket');
                       } else if (value == 'historique') {
                         context.push('/historique');
+                      } else if (value == 'carnet') {
+                        context.push('/carnet');
+                      } else if (value == 'performance') {
+                        context.push('/performance');
                       }
                     },
-                    itemBuilder: (context) => const [
+                    itemBuilder: (context) => [
                       PopupMenuItem(
                         value: 'profil',
-                        child: Text('Profil'),
+                        child: Text(text.profile),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: 'stocks',
                         child: Text('Stocks'),
                       ),
                       PopupMenuItem(
                         value: 'ticket',
-                        child: Text('Ticket de caisse'),
+                        child: Text(text.receipt),
                       ),
                       PopupMenuItem(
                         value: 'historique',
-                        child: Text('Historique'),
+                        child: Text(text.history),
+                      ),
+                      PopupMenuItem(
+                        value: 'performance',
+                        child: Text(text.performance),
+                      ),
+                      PopupMenuItem(
+                        value: 'carnet',
+                        child: Text(text.notes),
                       ),
                     ],
                   ),
@@ -179,75 +224,78 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
+                children: [
                   Text(
-                    'Actions rapides',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                    text.quickActions,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  Text(
-                    'Personnaliser',
-                    style: TextStyle(color: AppColors.primary),
+                  TextButton(
+                    onPressed: () => context.push('/parametres'),
+                    child: Text(text.customize),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
+              GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.25,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _QuickActionCard(
                     icon: Icons.trending_up,
                     color: AppColors.success,
-                    title: 'J’ai vendu',
-                    subtitle: 'Ajouter revenu',
+                    title: text.sale,
+                    subtitle: text.addIncome,
                     onTap: () => context.push('/saisie-vente'),
                   ),
-                  const SizedBox(width: 12),
                   _QuickActionCard(
                     icon: Icons.trending_down,
                     color: AppColors.error,
-                    title: 'J’ai dépensé',
-                    subtitle: 'Ajouter dépense',
+                    title: text.expense,
+                    subtitle: text.addExpense,
                     onTap: () => context.push('/saisie-depense'),
                   ),
-                  const SizedBox(width: 12),
-                  _QuickActionCard(
-                    icon: Icons.sync_alt,
-                    color: AppColors.primary,
-                    title: 'Mode rapide',
-                    subtitle: 'Raccourcis',
-                    onTap: () => context.push('/mode-rapide'),
-                  ),
-                  const SizedBox(width: 12),
                   _QuickActionCard(
                     icon: Icons.inventory_2_outlined,
                     color: AppColors.warning,
                     title: 'Stocks',
-                    subtitle: 'Gérer',
+                    subtitle: text.manage,
                     onTap: () => context.push('/stocks'),
+                  ),
+                  _QuickActionCard(
+                    icon: Icons.bar_chart,
+                    color: AppColors.primaryMuted,
+                    title: text.performance,
+                    subtitle: text.activities,
+                    onTap: () => context.push('/performance'),
                   ),
                 ],
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Résumé du mois',
-                style: TextStyle(fontWeight: FontWeight.w900),
+              Text(
+                text.monthSummary,
+                style: const TextStyle(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   _SummaryCard(
-                    title: 'Revenus',
+                    title: text.income,
                     amount: totalSales,
                     color: AppColors.success,
                   ),
                   const SizedBox(width: 12),
                   _SummaryCard(
-                    title: 'Dépenses',
+                    title: text.expenses,
                     amount: totalExpenses,
                     color: AppColors.error,
                   ),
                   const SizedBox(width: 12),
                   _SummaryCard(
-                    title: 'Solde net',
+                    title: text.netBalance,
                     amount: netTotal,
                     color: AppColors.primary,
                   ),
@@ -256,10 +304,10 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Dernières transactions',
-                      style: TextStyle(
+                      text.lastTransactions,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
@@ -267,13 +315,12 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   TextButton(
                     onPressed: () => context.push('/historique'),
-                    child: const Text('Voir tout'),
+                    child: Text(text.seeAll),
                   ),
                 ],
               ),
               if (transactions.isEmpty)
-                const SectionCard(
-                    child: Text('Aucune transaction pour le moment.'))
+                SectionCard(child: Text(text.emptyTransactions))
               else
                 ...transactions.take(3).map(TransactionTile.new),
               const SizedBox(height: 16),
@@ -288,6 +335,247 @@ class DashboardScreen extends ConsumerWidget {
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
         (match) => '${match[1]} ',
       );
+
+  void _openCustomizeSheet(BuildContext context, _DashboardText text) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  text.customize,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _CustomizeTile(
+                  icon: Icons.bar_chart,
+                  title: text.performance,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/performance');
+                  },
+                ),
+                _CustomizeTile(
+                  icon: Icons.history,
+                  title: text.history,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/historique');
+                  },
+                ),
+                _CustomizeTile(
+                  icon: Icons.receipt_long_outlined,
+                  title: text.receipt,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/ticket');
+                  },
+                ),
+                _CustomizeTile(
+                  icon: Icons.sticky_note_2_outlined,
+                  title: text.notes,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/carnet');
+                  },
+                ),
+                _CustomizeTile(
+                  icon: Icons.person_outline,
+                  title: text.profile,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.push('/profil');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DashboardText {
+  const _DashboardText({
+    required this.hello,
+    required this.dashboard,
+    required this.profile,
+    required this.receipt,
+    required this.history,
+    required this.settings,
+    required this.notes,
+    required this.performance,
+    required this.quickActions,
+    required this.customize,
+    required this.sale,
+    required this.addIncome,
+    required this.expense,
+    required this.addExpense,
+    required this.fastMode,
+    required this.shortcuts,
+    required this.manage,
+    required this.monthSummary,
+    required this.income,
+    required this.expenses,
+    required this.netBalance,
+    required this.lastTransactions,
+    required this.seeAll,
+    required this.emptyTransactions,
+    required this.generate,
+    required this.personalNotes,
+    required this.activities,
+  });
+
+  final String hello;
+  final String dashboard;
+  final String profile;
+  final String receipt;
+  final String history;
+  final String settings;
+  final String notes;
+  final String performance;
+  final String quickActions;
+  final String customize;
+  final String sale;
+  final String addIncome;
+  final String expense;
+  final String addExpense;
+  final String fastMode;
+  final String shortcuts;
+  final String manage;
+  final String monthSummary;
+  final String income;
+  final String expenses;
+  final String netBalance;
+  final String lastTransactions;
+  final String seeAll;
+  final String emptyTransactions;
+  final String generate;
+  final String personalNotes;
+  final String activities;
+
+  static _DashboardText of(AppLanguage language) {
+    return switch (language) {
+      AppLanguage.wolof => const _DashboardText(
+          hello: 'Nanga def',
+          dashboard: 'Tableau bi',
+          profile: 'Khar kanam',
+          receipt: 'Ticket caisse',
+          history: 'Jaar-jaar',
+          settings: 'Parametar',
+          notes: 'Karnet',
+          performance: 'Performance',
+          quickActions: 'Jef yu gaaw',
+          customize: 'Soppali',
+          sale: 'Dama jaay',
+          addIncome: 'Yokk xaalis',
+          expense: 'Dama fay',
+          addExpense: 'Yokk depaas',
+          fastMode: 'Mode gaaw',
+          shortcuts: 'Yoon yu gatt',
+          manage: 'Saytu',
+          monthSummary: 'Samare weer wi',
+          income: 'Duggal',
+          expenses: 'Depaas',
+          netBalance: 'Sold net',
+          lastTransactions: 'Transaction yu mujj',
+          seeAll: 'Gis lepp',
+          emptyTransactions: 'Amul transaction leegi.',
+          generate: 'Sos',
+          personalNotes: 'Not yu boppam',
+          activities: 'Aktivite yi',
+        ),
+      AppLanguage.english => const _DashboardText(
+          hello: 'Hello',
+          dashboard: 'Dashboard',
+          profile: 'Profile',
+          receipt: 'Receipt',
+          history: 'History',
+          settings: 'Settings',
+          notes: 'Notebook',
+          performance: 'Performance',
+          quickActions: 'Quick actions',
+          customize: 'Customize',
+          sale: 'I sold',
+          addIncome: 'Add income',
+          expense: 'I spent',
+          addExpense: 'Add expense',
+          fastMode: 'Fast mode',
+          shortcuts: 'Shortcuts',
+          manage: 'Manage',
+          monthSummary: 'Monthly summary',
+          income: 'Income',
+          expenses: 'Expenses',
+          netBalance: 'Net balance',
+          lastTransactions: 'Latest transactions',
+          seeAll: 'See all',
+          emptyTransactions: 'No transactions yet.',
+          generate: 'Generate',
+          personalNotes: 'Personal notes',
+          activities: 'Activities',
+        ),
+      AppLanguage.french => const _DashboardText(
+          hello: 'Bonjour',
+          dashboard: 'Tableau de bord',
+          profile: 'Profil',
+          receipt: 'Ticket de caisse',
+          history: 'Historique',
+          settings: 'Parametres',
+          notes: 'Carnet',
+          performance: 'Performance',
+          quickActions: 'Actions rapides',
+          customize: 'Personnaliser',
+          sale: 'Vente',
+          addIncome: 'Ajouter revenu',
+          expense: ' Depense',
+          addExpense: 'Ajouter depense',
+          fastMode: 'Mode rapide',
+          shortcuts: 'Raccourcis',
+          manage: 'Gerer',
+          monthSummary: 'Resume du mois',
+          income: 'Revenus',
+          expenses: 'Depenses',
+          netBalance: 'Solde net',
+          lastTransactions: 'Dernieres transactions',
+          seeAll: 'Voir tout',
+          emptyTransactions: 'Aucune transaction pour le moment.',
+          generate: 'Generer',
+          personalNotes: 'Notes personnelles',
+          activities: 'Activites',
+        ),
+    };
+  }
+}
+
+class _CustomizeTile extends StatelessWidget {
+  const _CustomizeTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+      trailing: const Icon(Icons.chevron_right),
+    );
+  }
 }
 
 class _QuickActionCard extends StatelessWidget {
@@ -307,80 +595,38 @@ class _QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: color.withValues(alpha: 0.18),
-                child: Icon(icon, size: 18, color: color),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-              ),
-            ],
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(minHeight: 118),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: color.withValues(alpha: 0.18),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
         ),
       ),
     );
-  }
-}
-
-class _PatternDots extends StatelessWidget {
-  const _PatternDots({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _DotsPainter(color),
-      ),
-    );
-  }
-}
-
-class _DotsPainter extends CustomPainter {
-  _DotsPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    const dotRadius = 2.2;
-    const gap = 10.0;
-    for (double y = 0; y <= size.height; y += gap) {
-      for (double x = 0; x <= size.width; x += gap) {
-        canvas.drawCircle(Offset(x, y), dotRadius, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DotsPainter oldDelegate) {
-    return oldDelegate.color != color;
   }
 }
 
@@ -410,7 +656,8 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.9)),
+              style:
+                  TextStyle(fontSize: 12, color: color.withValues(alpha: 0.9)),
             ),
             const SizedBox(height: 8),
             Text(
@@ -423,7 +670,8 @@ class _SummaryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Ce mois',
-              style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7)),
+              style:
+                  TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7)),
             ),
           ],
         ),

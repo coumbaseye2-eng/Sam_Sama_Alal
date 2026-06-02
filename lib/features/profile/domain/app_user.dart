@@ -5,7 +5,6 @@ class AppUser {
     required this.email,
     required this.activityType,
     required this.passwordHash,
-    this.pinHash = '',
     this.dailyGoal = 0,
     this.photoUrl,
   });
@@ -16,7 +15,6 @@ class AppUser {
   final String activityType;
   final int dailyGoal;
   final String passwordHash;
-  final String pinHash;
   final String? photoUrl;
 
   String get firstName => fullName.trim().split(' ').first;
@@ -29,7 +27,6 @@ class AppUser {
     String? activityType,
     int? dailyGoal,
     String? passwordHash,
-    String? pinHash,
     String? photoUrl,
   }) {
     return AppUser(
@@ -39,7 +36,6 @@ class AppUser {
       activityType: activityType ?? this.activityType,
       dailyGoal: dailyGoal ?? this.dailyGoal,
       passwordHash: passwordHash ?? this.passwordHash,
-      pinHash: pinHash ?? this.pinHash,
       photoUrl: photoUrl ?? this.photoUrl,
     );
   }
@@ -52,7 +48,6 @@ class AppUser {
       activityType: json['activityType'] as String,
       dailyGoal: json['dailyGoal'] as int? ?? 0,
       passwordHash: json['passwordHash'] as String? ?? '',
-      pinHash: json['pinHash'] as String? ?? '',
       photoUrl: json['photoUrl'] as String?,
     );
   }
@@ -65,7 +60,6 @@ class AppUser {
       'activityType': activityType,
       'dailyGoal': dailyGoal,
       'passwordHash': passwordHash,
-      'pinHash': pinHash,
       'photoUrl': photoUrl,
     };
   }

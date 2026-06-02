@@ -9,6 +9,10 @@ class AppTransaction {
     required this.category,
     required this.createdAt,
     this.paymentMethod = 'Espèces',
+    this.stockItemId,
+    this.productName,
+    this.quantity = 1,
+    this.unitPrice = 0,
     this.synced = false,
   });
 
@@ -19,11 +23,22 @@ class AppTransaction {
   final String category;
   final DateTime createdAt;
   final String paymentMethod;
+  final String? stockItemId;
+  final String? productName;
+  final int quantity;
+  final int unitPrice;
   final bool synced;
 
   int get signedAmount => type == TransactionType.sale ? amount : -amount;
 
-  AppTransaction copyWith({bool? synced, String? paymentMethod}) {
+  AppTransaction copyWith({
+    bool? synced,
+    String? paymentMethod,
+    String? stockItemId,
+    String? productName,
+    int? quantity,
+    int? unitPrice,
+  }) {
     return AppTransaction(
       id: id,
       uid: uid,
@@ -32,6 +47,10 @@ class AppTransaction {
       category: category,
       createdAt: createdAt,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      stockItemId: stockItemId ?? this.stockItemId,
+      productName: productName ?? this.productName,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
       synced: synced ?? this.synced,
     );
   }
@@ -45,6 +64,10 @@ class AppTransaction {
       category: json['category'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       paymentMethod: json['paymentMethod'] as String? ?? 'Espèces',
+      stockItemId: json['stockItemId'] as String?,
+      productName: json['productName'] as String?,
+      quantity: json['quantity'] as int? ?? 1,
+      unitPrice: json['unitPrice'] as int? ?? 0,
       synced: json['synced'] as bool? ?? false,
     );
   }
@@ -64,6 +87,10 @@ class AppTransaction {
       paymentMethod: (json['moyenPaiement'] ??
           json['paymentMethod'] ??
           'Espèces') as String,
+      stockItemId: json['stockItemId'] as String?,
+      productName: json['productName'] as String?,
+      quantity: json['quantity'] as int? ?? 1,
+      unitPrice: json['unitPrice'] as int? ?? 0,
       synced: true,
     );
   }
@@ -77,6 +104,10 @@ class AppTransaction {
       'category': category,
       'createdAt': createdAt.toIso8601String(),
       'paymentMethod': paymentMethod,
+      'stockItemId': stockItemId,
+      'productName': productName,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
       'synced': synced,
     };
   }
@@ -90,6 +121,10 @@ class AppTransaction {
       'categorie': category,
       'dateHeure': createdAt.toIso8601String(),
       'moyenPaiement': paymentMethod,
+      'stockItemId': stockItemId,
+      'productName': productName,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
       'synced': true,
       'updatedAt': DateTime.now().toIso8601String(),
     };

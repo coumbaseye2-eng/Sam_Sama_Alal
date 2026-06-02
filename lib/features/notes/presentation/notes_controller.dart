@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -10,7 +13,9 @@ final notesControllerProvider =
 class NotesController extends Notifier<List<PersonalNote>> {
   @override
   List<PersonalNote> build() {
-    return ref.read(localStorageServiceProvider).readNotes();
+    final notes = ref.read(localStorageServiceProvider).readNotes();
+    Future.microtask(restoreOnlineNotes);
+    return notes;
   }
 
   void addNote({required String title, required String content}) {
@@ -25,6 +30,7 @@ class NotesController extends Notifier<List<PersonalNote>> {
 
     state = [note, ...state];
     ref.read(localStorageServiceProvider).saveNotes(state);
+    _saveNoteOnline(note);
   }
 
   void updateNote({
@@ -44,10 +50,95 @@ class NotesController extends Notifier<List<PersonalNote>> {
           note,
     ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     ref.read(localStorageServiceProvider).saveNotes(state);
+    PersonalNote? note;
+    for (final item in state) {
+      if (item.id == id) {
+        note = item;
+        break;
+      }
+    }
+    if (note != null) {
+      _saveNoteOnline(note);
+    }
   }
 
   void deleteNote(String id) {
     state = state.where((note) => note.id != id).toList();
     ref.read(localStorageServiceProvider).saveNotes(state);
+    _deleteNoteOnline(id);
+  }
+
+  Future<void> restoreOnlineNotes() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid == 'local-user') {
+      return;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('notes')
+          .doc(uid)
+          .collection('items')
+          .orderBy('updatedAt', descending: true)
+          .get();
+
+      final onlineNotes = snapshot.docs
+          .map((doc) => PersonalNote.fromJson(doc.data()))
+          .toList();
+      final mergedById = <String, PersonalNote>{
+        for (final note in onlineNotes) note.id: note,
+        for (final note in state) note.id: note,
+      };
+
+      state = mergedById.values.toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      await ref.read(localStorageServiceProvider).saveNotes(state);
+      for (final note in state) {
+        await _saveNoteOnline(note);
+      }
+    } catch (error) {
+      debugPrint('Firestore restoreOnlineNotes error: $error');
+      // Les notes locales restent disponibles si Firestore est indisponible.
+    }
+  }
+
+  Future<void> _saveNoteOnline(PersonalNote note) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      debugPrint('Firestore note skipped: no FirebaseAuth user.');
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('notes')
+          .doc(uid)
+          .collection('items')
+          .doc(note.id)
+          .set(note.toJson(), SetOptions(merge: true));
+    } catch (error) {
+      debugPrint('Firestore saveNote error: $error');
+      // La note reste dans Hive et sera renvoyee lors d'une prochaine session.
+    }
+  }
+
+  Future<void> _deleteNoteOnline(String id) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      debugPrint('Firestore deleteNote skipped: no FirebaseAuth user.');
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('notes')
+          .doc(uid)
+          .collection('items')
+          .doc(id)
+          .delete();
+    } catch (error) {
+      debugPrint('Firestore deleteNote error: $error');
+      // Suppression locale deja appliquee.
+    }
   }
 }

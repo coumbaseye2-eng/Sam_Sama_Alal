@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../features/notes/domain/personal_note.dart';
 import '../../features/profile/domain/app_user.dart';
+import '../../features/settings/domain/app_settings.dart';
 import '../../features/stocks/domain/stock_item.dart';
 import '../../features/transactions/domain/app_transaction.dart';
 
@@ -15,11 +16,13 @@ class LocalStorageService {
   static const transactionBoxName = 'transactionBox';
   static const notesBoxName = 'notesBox';
   static const stocksBoxName = 'stocksBox';
+  static const settingsBoxName = 'settingsBox';
 
   Box get _userBox => Hive.box(userBoxName);
   Box get _transactionBox => Hive.box(transactionBoxName);
   Box get _notesBox => Hive.box(notesBoxName);
   Box get _stocksBox => Hive.box(stocksBoxName);
+  Box get _settingsBox => Hive.box(settingsBoxName);
 
   AppUser? readUser() {
     final data = _userBox.get('currentUser');
@@ -100,6 +103,18 @@ class LocalStorageService {
       'items',
       stocks.map((item) => item.toJson()).toList(),
     );
+  }
+
+  AppSettings readSettings() {
+    final data = _settingsBox.get('appSettings');
+    if (data is Map) {
+      return AppSettings.fromJson(Map<String, dynamic>.from(data));
+    }
+    return const AppSettings();
+  }
+
+  Future<void> saveSettings(AppSettings settings) async {
+    await _settingsBox.put('appSettings', settings.toJson());
   }
 
   Future<void> clearAccountData() async {

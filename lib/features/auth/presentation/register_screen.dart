@@ -136,7 +136,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         );
     if (success && mounted) {
-              context.push('/create-pin');
+      context.push('/dashboard');
     }
   }
 }

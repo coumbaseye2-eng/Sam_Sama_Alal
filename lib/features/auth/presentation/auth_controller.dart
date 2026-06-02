@@ -1,8 +1,6 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/local_storage_service.dart';
@@ -16,9 +14,29 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() {
     final storage = ref.read(localStorageServiceProvider);
+    final cachedUser = storage.readUser();
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (firebaseUser == null) {
+      storage.saveLoginState(false);
+      return AuthState(user: cachedUser, isLoggedIn: false);
+    }
+
+    final user = cachedUser?.uid == firebaseUser.uid
+        ? cachedUser
+        : AppUser(
+            uid: firebaseUser.uid,
+            fullName: firebaseUser.displayName ?? 'Commerçant',
+            email: firebaseUser.email ?? '',
+            activityType: 'Boutiquier',
+            dailyGoal: 0,
+            passwordHash: '',
+            photoUrl: null,
+          );
+
     return AuthState(
-      user: storage.readUser(),
-      isLoggedIn: storage.readIsLoggedIn(),
+      user: user,
+      isLoggedIn: user != null && storage.readIsLoggedIn(),
     );
   }
 
@@ -78,40 +96,6 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  void completeRegistration(String pin) {
-    final registration = state.pendingRegistration;
-    if (registration == null) {
-      return;
-    }
-
-    final user = AppUser(
-      uid: FirebaseAuth.instance.currentUser?.uid ?? 'local-user',
-      fullName: registration.fullName,
-      email: registration.email.toLowerCase(),
-      activityType: registration.activityType,
-      dailyGoal: registration.dailyGoal,
-      passwordHash: _hashSecret(registration.password),
-      pinHash: _hashPin(pin),
-      photoUrl: null,
-    );
-
-    state = AuthState(user: user, isLoggedIn: true);
-    ref.read(localStorageServiceProvider).saveUser(user, isLoggedIn: true);
-  }
-
-  void updatePin(String pin) {
-    final user = state.user;
-    if (user == null) {
-      return;
-    }
-
-    final updatedUser = user.copyWith(pinHash: _hashPin(pin));
-    state = state.copyWith(user: updatedUser);
-    ref
-        .read(localStorageServiceProvider)
-        .saveUser(updatedUser, isLoggedIn: state.isLoggedIn);
-  }
-
   Future<bool> updateProfile({
     required String fullName,
     required String activityType,
@@ -142,7 +126,10 @@ class AuthController extends Notifier<AuthState> {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         await firebaseUser.updateDisplayName(updatedUser.fullName);
-        await FirebaseFirestore.instance.collection('users').doc(updatedUser.uid).set(
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(updatedUser.uid)
+            .set(
           {
             'uid': updatedUser.uid,
             'fullName': updatedUser.fullName,
@@ -155,7 +142,8 @@ class AuthController extends Notifier<AuthState> {
           SetOptions(merge: true),
         );
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Firestore updateProfile error: $error');
       // Mise à jour locale prioritaire; la sync cloud reste best-effort.
     }
 
@@ -173,7 +161,10 @@ class AuthController extends Notifier<AuthState> {
     try {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .delete();
         await firebaseUser.delete();
       }
 
@@ -193,20 +184,6 @@ class AuthController extends Notifier<AuthState> {
       state = const AuthState();
       return true;
     }
-  }
-
-  bool loginWithPin(String pin) {
-    final user = state.user;
-    if (user == null) {
-      return false;
-    }
-
-    final isValid = user.pinHash == _hashPin(pin);
-    if (isValid) {
-      state = state.copyWith(isLoggedIn: true);
-      ref.read(localStorageServiceProvider).saveLoginState(true);
-    }
-    return isValid;
   }
 
   Future<bool> loginWithEmailAndPassword({
@@ -242,7 +219,6 @@ class AuthController extends Notifier<AuthState> {
             cloudUser?.activityType ?? cachedUser?.activityType ?? 'Boutiquier',
         dailyGoal: cloudUser?.dailyGoal ?? cachedUser?.dailyGoal ?? 0,
         passwordHash: '',
-        pinHash: cloudUser?.pinHash ?? cachedUser?.pinHash ?? '',
         photoUrl: cloudUser?.photoUrl ?? cachedUser?.photoUrl,
       );
 
@@ -272,14 +248,6 @@ class AuthController extends Notifier<AuthState> {
     await ref.read(localStorageServiceProvider).saveLoginState(false);
   }
 
-  String _hashPin(String pin) {
-    return sha256.convert(utf8.encode(pin)).toString();
-  }
-
-  String _hashSecret(String value) {
-    return sha256.convert(utf8.encode(value)).toString();
-  }
-
   Future<void> _saveUserProfile(AppUser user) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -292,7 +260,8 @@ class AuthController extends Notifier<AuthState> {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Firestore saveUserProfile error: $error');
       // Le profil local Hive reste la source de secours si Firestore n'est pas prêt.
     }
   }
@@ -313,10 +282,10 @@ class AuthController extends Notifier<AuthState> {
         activityType: data['activityType'] as String? ?? 'Boutiquier',
         dailyGoal: data['dailyGoal'] as int? ?? 0,
         passwordHash: '',
-        pinHash: data['pinHash'] as String? ?? '',
         photoUrl: data['photoUrl'] as String?,
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Firestore readUserProfile error: $error');
       return null;
     }
   }

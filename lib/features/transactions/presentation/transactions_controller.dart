@@ -1,5 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/local_storage_service.dart';
@@ -36,8 +38,14 @@ class TransactionsController extends Notifier<List<AppTransaction>> {
     required int amount,
     required String category,
     required String paymentMethod,
+    String? stockItemId,
+    String? productName,
+    int quantity = 1,
+    int unitPrice = 0,
   }) {
-    final uid = ref.read(authControllerProvider).user?.uid ?? 'local-user';
+    final uid = FirebaseAuth.instance.currentUser?.uid ??
+        ref.read(authControllerProvider).user?.uid ??
+        'local-user';
     final transaction = AppTransaction(
       id: const Uuid().v4(),
       uid: uid,
@@ -46,6 +54,10 @@ class TransactionsController extends Notifier<List<AppTransaction>> {
       category: category,
       paymentMethod: paymentMethod,
       createdAt: DateTime.now(),
+      stockItemId: stockItemId,
+      productName: productName,
+      quantity: quantity,
+      unitPrice: unitPrice,
     );
 
     state = [transaction, ...state];
@@ -61,8 +73,14 @@ class TransactionsController extends Notifier<List<AppTransaction>> {
     }
   }
 
+  void deleteTransaction(AppTransaction transaction) {
+    state = state.where((item) => item.id != transaction.id).toList();
+    ref.read(localStorageServiceProvider).saveTransactions(state);
+    _deleteTransactionOnline(transaction.id);
+  }
+
   Future<void> restoreOnlineTransactions() async {
-    final uid = ref.read(authControllerProvider).user?.uid;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || uid == 'local-user') {
       return;
     }
@@ -88,27 +106,53 @@ class TransactionsController extends Notifier<List<AppTransaction>> {
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       await ref.read(localStorageServiceProvider).saveTransactions(state);
       await syncPendingTransactions();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Firestore restoreOnlineTransactions error: $error');
       await syncPendingTransactions();
     }
   }
 
   Future<void> _saveTransactionOnline(AppTransaction transaction) async {
-    if (transaction.uid == 'local-user') {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      debugPrint('Firestore transaction skipped: no FirebaseAuth user.');
       return;
     }
 
     try {
       await FirebaseFirestore.instance
           .collection('transactions')
-          .doc(transaction.uid)
+          .doc(uid)
           .collection('items')
           .doc(transaction.id)
-          .set(transaction.toFirestore(), SetOptions(merge: true));
+          .set({
+        ...transaction.toFirestore(),
+        'uid': uid,
+      }, SetOptions(merge: true));
 
       _markAsSynced(transaction.id);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Firestore saveTransaction error: $error');
       // Hive garde la transaction en attente; elle sera renvoyée plus tard.
+    }
+  }
+
+  Future<void> _deleteTransactionOnline(String transactionId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      debugPrint('Firestore deleteTransaction skipped: no FirebaseAuth user.');
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(uid)
+          .collection('items')
+          .doc(transactionId)
+          .delete();
+    } catch (error) {
+      debugPrint('Firestore deleteTransaction error: $error');
     }
   }
 
