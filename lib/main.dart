@@ -21,6 +21,7 @@ Future<void> main() async {
   await Hive.openBox(LocalStorageService.notesBoxName);
   await Hive.openBox(LocalStorageService.stocksBoxName);
   await Hive.openBox(LocalStorageService.settingsBoxName);
+  await Hive.openBox(LocalStorageService.expenseCategoriesBoxName);
   await NotificationService.instance.initialize();
 
   runApp(const ProviderScope(child: SamSamaApp()));

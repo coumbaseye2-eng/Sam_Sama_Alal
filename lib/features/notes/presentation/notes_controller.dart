@@ -33,6 +33,37 @@ class NotesController extends Notifier<List<PersonalNote>> {
     _saveNoteOnline(note);
   }
 
+  void addDebtNote({
+    required String clientName,
+    required String content,
+    required DebtDirection debtDirection,
+    required int initialAmount,
+    required String phoneNumber,
+    required String nationalId,
+    required String photoPath,
+  }) {
+    final now = DateTime.now();
+    final cleanName = clientName.trim();
+    final note = PersonalNote(
+      id: const Uuid().v4(),
+      title: cleanName.isEmpty ? 'Client sans nom' : cleanName,
+      content: content.trim(),
+      createdAt: now,
+      updatedAt: now,
+      kind: PersonalNoteKind.debt,
+      debtDirection: debtDirection,
+      clientName: cleanName,
+      phoneNumber: phoneNumber.trim(),
+      nationalId: nationalId.trim(),
+      photoPath: photoPath.trim(),
+      initialAmount: initialAmount,
+    );
+
+    state = [note, ...state];
+    ref.read(localStorageServiceProvider).saveNotes(state);
+    _saveNoteOnline(note);
+  }
+
   void updateNote({
     required String id,
     required String title,
@@ -62,10 +93,83 @@ class NotesController extends Notifier<List<PersonalNote>> {
     }
   }
 
+  void updateDebtNote({
+    required String id,
+    required String clientName,
+    required String content,
+    required DebtDirection debtDirection,
+    required int initialAmount,
+    required String phoneNumber,
+    required String nationalId,
+    required String photoPath,
+  }) {
+    final cleanName = clientName.trim();
+    state = [
+      for (final note in state)
+        if (note.id == id)
+          note.copyWith(
+            title: cleanName.isEmpty ? 'Client sans nom' : cleanName,
+            content: content.trim(),
+            updatedAt: DateTime.now(),
+            kind: PersonalNoteKind.debt,
+            debtDirection: debtDirection,
+            clientName: cleanName,
+            phoneNumber: phoneNumber.trim(),
+            nationalId: nationalId.trim(),
+            photoPath: photoPath.trim(),
+            initialAmount: initialAmount,
+          )
+        else
+          note,
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    _persistAndSync(id);
+  }
+
+  void addDebtPayment({
+    required String id,
+    required int amount,
+    String note = '',
+  }) {
+    if (amount <= 0) return;
+    state = [
+      for (final item in state)
+        if (item.id == id)
+          item.copyWith(
+            updatedAt: DateTime.now(),
+            payments: [
+              DebtPayment(
+                id: const Uuid().v4(),
+                amount: amount,
+                createdAt: DateTime.now(),
+                note: note.trim(),
+              ),
+              ...item.payments,
+            ],
+          )
+        else
+          item,
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    _persistAndSync(id);
+  }
+
   void deleteNote(String id) {
     state = state.where((note) => note.id != id).toList();
     ref.read(localStorageServiceProvider).saveNotes(state);
     _deleteNoteOnline(id);
+  }
+
+  void _persistAndSync(String id) {
+    ref.read(localStorageServiceProvider).saveNotes(state);
+    PersonalNote? note;
+    for (final item in state) {
+      if (item.id == id) {
+        note = item;
+        break;
+      }
+    }
+    if (note != null) {
+      _saveNoteOnline(note);
+    }
   }
 
   Future<void> restoreOnlineNotes() async {

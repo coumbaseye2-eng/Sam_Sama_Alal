@@ -9,6 +9,7 @@ import '../../stocks/domain/stock_item.dart';
 import '../../stocks/presentation/stocks_controller.dart';
 import '../domain/transaction_type.dart';
 import 'amount_keypad.dart';
+import 'expense_categories_controller.dart';
 import 'payment_method_badge.dart';
 import 'transactions_controller.dart';
 
@@ -265,19 +266,8 @@ class _TransactionEntryScreenState
   }
 
   Widget _buildExpenseScreen(BuildContext context) {
-    final categories = [
-      'Stock',
-      'Transport',
-      'Loyer',
-      'Electricite',
-      'Eau',
-      'Internet',
-      'Salaire',
-      'Maintenance',
-      'Emballage',
-      'Frais mobile money',
-      'Autre',
-    ];
+    final categories = ref.watch(expenseCategoriesControllerProvider);
+    final selectedCategory = categories.contains(_category) ? _category : null;
 
     return PrimaryScaffold(
       title: 'Dépense',
@@ -301,19 +291,36 @@ class _TransactionEntryScreenState
             ),
           ),
           const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: [
+              const Expanded(
+                child: Text(
+                  'Catégorie',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => context.push('/expense-categories'),
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('Gérer'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: selectedCategory,
+            items: [
               for (final category in categories)
-                ChoiceChip(
-                  label: Text(category),
-                  selected: _category == category,
-                  onSelected: (_) => setState(() {
-                    _category = _category == category ? null : category;
-                  }),
+                DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
                 ),
             ],
+            onChanged: (value) => setState(() => _category = value),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.category_outlined),
+              hintText: 'Choisir une catégorie',
+            ),
           ),
           const SizedBox(height: 24),
           AmountKeypad(

@@ -17,12 +17,14 @@ class LocalStorageService {
   static const notesBoxName = 'notesBox';
   static const stocksBoxName = 'stocksBox';
   static const settingsBoxName = 'settingsBox';
+  static const expenseCategoriesBoxName = 'expenseCategoriesBox';
 
   Box get _userBox => Hive.box(userBoxName);
   Box get _transactionBox => Hive.box(transactionBoxName);
   Box get _notesBox => Hive.box(notesBoxName);
   Box get _stocksBox => Hive.box(stocksBoxName);
   Box get _settingsBox => Hive.box(settingsBoxName);
+  Box get _expenseCategoriesBox => Hive.box(expenseCategoriesBoxName);
 
   AppUser? readUser() {
     final data = _userBox.get('currentUser');
@@ -105,6 +107,20 @@ class LocalStorageService {
     );
   }
 
+  List<String> readExpenseCategories() {
+    final rawItems =
+        _expenseCategoriesBox.get('items', defaultValue: <dynamic>[]);
+    if (rawItems is! List) {
+      return const [];
+    }
+
+    return rawItems.whereType<String>().toList();
+  }
+
+  Future<void> saveExpenseCategories(List<String> categories) async {
+    await _expenseCategoriesBox.put('items', categories);
+  }
+
   AppSettings readSettings() {
     final data = _settingsBox.get('appSettings');
     if (data is Map) {
@@ -122,5 +138,6 @@ class LocalStorageService {
     await _transactionBox.clear();
     await _notesBox.clear();
     await _stocksBox.clear();
+    await _expenseCategoriesBox.clear();
   }
 }

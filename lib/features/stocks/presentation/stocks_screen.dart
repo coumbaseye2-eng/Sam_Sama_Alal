@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/primary_scaffold.dart';
@@ -82,9 +83,14 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
             ...stocks.map(
               (stock) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: InkWell(
-                  onLongPress: () => _openStockActions(context, stock),
-                  child: _StockTile(stock: stock, sku: _sku(stock)),
+                child: _StockTile(
+                  stock: stock,
+                  sku: _sku(stock),
+                  onEdit: () => _openStockSheet(context, stock: stock),
+                  onDelete: () => _confirmDeleteStock(context, stock),
+                  onArchive: () => ref
+                      .read(stocksControllerProvider.notifier)
+                      .archiveStock(stock.id),
                 ),
               ),
             ),
@@ -94,29 +100,16 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
   }
 
   Future<void> _openStockSheet(BuildContext context, {StockItem? stock}) async {
-    final nameOptions = ref
-        .read(stocksControllerProvider)
-        .where((item) => !item.isArchived)
-        .map((item) => item.name.trim())
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    if (stock != null && stock.name.trim().isNotEmpty) {
-      nameOptions.add(stock.name.trim());
-      nameOptions.sort();
-    }
-    if (!nameOptions.contains('Autre')) {
-      nameOptions.add('Autre');
-    }
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) {
         return _StockSheet(
-          nameOptions: nameOptions,
           initialStock: stock,
+          onManageCategories: () {
+            Navigator.of(sheetContext).pop();
+            context.push('/stock-categories');
+          },
           onSave: ({
             required String name,
             required String category,
@@ -144,47 +137,6 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
             }
             Navigator.of(sheetContext).pop();
           },
-        );
-      },
-    );
-  }
-
-  Future<void> _openStockActions(BuildContext context, StockItem stock) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Modifier'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _openStockSheet(context, stock: stock);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Supprimer'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _confirmDeleteStock(context, stock);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.archive_outlined),
-                title: const Text('Déplacer dans la corbeille'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  ref
-                      .read(stocksControllerProvider.notifier)
-                      .archiveStock(stock.id);
-                },
-              ),
-            ],
-          ),
         );
       },
     );
@@ -225,12 +177,12 @@ class _StocksScreenState extends ConsumerState<StocksScreen> {
 class _StockSheet extends StatefulWidget {
   const _StockSheet({
     required this.onSave,
-    required this.nameOptions,
+    required this.onManageCategories,
     this.initialStock,
   });
 
-  final List<String> nameOptions;
   final StockItem? initialStock;
+  final VoidCallback onManageCategories;
   final void Function({
     required String name,
     required String category,
@@ -244,18 +196,15 @@ class _StockSheet extends StatefulWidget {
 }
 
 class _StockSheetState extends State<_StockSheet> {
-  late final TextEditingController _customNameController;
+  late final TextEditingController _nameController;
   late final TextEditingController _categoryController;
   late final TextEditingController _quantityController;
   late final TextEditingController _unitPriceController;
   late final TextEditingController _thresholdController;
-
-  String _selectedName = '';
-
   @override
   void initState() {
     super.initState();
-    _customNameController = TextEditingController();
+    _nameController = TextEditingController();
     _categoryController = TextEditingController(text: 'Général');
     _quantityController = TextEditingController(text: '1');
     _unitPriceController = TextEditingController(text: '0');
@@ -263,25 +212,17 @@ class _StockSheetState extends State<_StockSheet> {
 
     final initial = widget.initialStock;
     if (initial != null) {
+      _nameController.text = initial.name;
       _categoryController.text = initial.category;
       _quantityController.text = initial.quantity.toString();
       _unitPriceController.text = initial.unitPrice.toString();
       _thresholdController.text = initial.alertThreshold.toString();
-      if (widget.nameOptions.contains(initial.name)) {
-        _selectedName = initial.name;
-      } else {
-        _selectedName = 'Autre';
-        _customNameController.text = initial.name;
-      }
-    } else {
-      _selectedName =
-          widget.nameOptions.isNotEmpty ? widget.nameOptions.first : 'Autre';
     }
   }
 
   @override
   void dispose() {
-    _customNameController.dispose();
+    _nameController.dispose();
     _categoryController.dispose();
     _quantityController.dispose();
     _unitPriceController.dispose();
@@ -308,33 +249,21 @@ class _StockSheetState extends State<_StockSheet> {
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedName.isEmpty ? null : _selectedName,
+          TextField(
+            controller: _nameController,
             decoration: const InputDecoration(labelText: 'Nom de l’article'),
-            items: widget.nameOptions
-                .map(
-                  (name) => DropdownMenuItem(
-                    value: name,
-                    child: Text(name),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedName = value);
-            },
           ),
-          if (_selectedName == 'Autre') ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _customNameController,
-              decoration: const InputDecoration(labelText: 'Nom personnalisé'),
-            ),
-          ],
           const SizedBox(height: 12),
           TextField(
             controller: _categoryController,
-            decoration: const InputDecoration(labelText: 'Catégorie'),
+            decoration: InputDecoration(
+              labelText: 'Catégorie',
+              suffixIcon: IconButton(
+                tooltip: 'Gérer les catégories',
+                onPressed: widget.onManageCategories,
+                icon: const Icon(Icons.category_outlined),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -360,12 +289,9 @@ class _StockSheetState extends State<_StockSheet> {
               final quantity = int.tryParse(_quantityController.text) ?? 0;
               final unitPrice = int.tryParse(_unitPriceController.text) ?? 0;
               final threshold = int.tryParse(_thresholdController.text) ?? 3;
-              final name = _selectedName == 'Autre'
-                  ? _customNameController.text
-                  : _selectedName;
 
               widget.onSave(
-                name: name,
+                name: _nameController.text,
                 category: _categoryController.text,
                 quantity: quantity,
                 unitPrice: unitPrice,
@@ -423,10 +349,19 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _StockTile extends StatelessWidget {
-  const _StockTile({required this.stock, required this.sku});
+  const _StockTile({
+    required this.stock,
+    required this.sku,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onArchive,
+  });
 
   final StockItem stock;
   final String sku;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -480,6 +415,32 @@ class _StockTile extends StatelessWidget {
                         label: 'rupture proche',
                         warning: true,
                       ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Modifier'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onArchive,
+                      icon: const Icon(Icons.archive_outlined, size: 16),
+                      label: const Text('Corbeille'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text('Supprimer'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: const BorderSide(color: AppColors.danger),
+                      ),
+                    ),
                   ],
                 ),
               ],

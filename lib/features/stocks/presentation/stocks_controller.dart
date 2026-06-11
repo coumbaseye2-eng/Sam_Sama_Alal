@@ -89,6 +89,44 @@ class StocksController extends Notifier<List<StockItem>> {
     _saveStockOnline(updatedStock);
   }
 
+  void renameCategory({
+    required String oldCategory,
+    required String newCategory,
+  }) {
+    final nextCategory = newCategory.trim();
+    if (nextCategory.isEmpty || oldCategory == nextCategory) {
+      return;
+    }
+
+    state = [
+      for (final stock in state)
+        if (stock.category == oldCategory)
+          stock.copyWith(category: nextCategory, updatedAt: DateTime.now())
+        else
+          stock,
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    ref.read(localStorageServiceProvider).saveStocks(state);
+    for (final stock in state.where((item) => item.category == nextCategory)) {
+      _saveStockOnline(stock);
+    }
+  }
+
+  void archiveCategory({required String category}) {
+    state = [
+      for (final stock in state)
+        if (stock.category == category)
+          stock.copyWith(isArchived: true, updatedAt: DateTime.now())
+        else
+          stock,
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    ref.read(localStorageServiceProvider).saveStocks(state);
+    for (final stock in state.where((item) => item.category == category)) {
+      _saveStockOnline(stock);
+    }
+  }
+
   bool decreaseStock({
     required String id,
     required int quantity,

@@ -230,7 +230,7 @@ class DashboardScreen extends ConsumerWidget {
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   TextButton(
-                    onPressed: () => context.push('/parametres'),
+                    onPressed: () => _openCustomizeSheet(context, text),
                     child: Text(text.customize),
                   ),
                 ],

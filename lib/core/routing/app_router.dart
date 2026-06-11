@@ -10,9 +10,11 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/dashboard/presentation/performance_screen.dart';
 import '../../features/notes/presentation/notes_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/stocks/presentation/stock_categories_screen.dart';
 import '../../features/stocks/presentation/stocks_screen.dart';
 import '../../features/transactions/domain/transaction_type.dart';
 import '../../features/transactions/presentation/confirmation_screen.dart';
+import '../../features/transactions/presentation/expense_categories_screen.dart';
 import '../../features/transactions/presentation/history_screen.dart';
 import '../../features/transactions/presentation/transaction_entry_screen.dart';
 import '../../features/transactions/presentation/ticket_screen.dart';
@@ -78,10 +80,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: '/historique',
           builder: (context, state) => const HistoryScreen()),
       GoRoute(
+          path: '/expense-categories',
+          builder: (context, state) => const ExpenseCategoriesScreen()),
+      GoRoute(
           path: '/performance',
           builder: (context, state) => const PerformanceScreen()),
       GoRoute(
           path: '/stocks', builder: (context, state) => const StocksScreen()),
+      GoRoute(
+          path: '/stock-categories',
+          builder: (context, state) => const StockCategoriesScreen()),
       GoRoute(
           path: '/profil', builder: (context, state) => const ProfileScreen()),
       GoRoute(
